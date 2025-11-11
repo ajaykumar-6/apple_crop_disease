@@ -31,7 +31,7 @@ model = None  # model will be loaded in background
 # ==========================================
 def download_model():
     """Download model file from Hugging Face (with optional token)."""
-    hf_token = os.getenv("HF_TOKEN")
+    hf_token = os.getenv("hf_token")
     headers = {"Authorization": f"Bearer {hf_token}"} if hf_token else {}
 
     if not os.path.exists(MODEL_PATH) or os.path.getsize(MODEL_PATH) < 1_000_000:
