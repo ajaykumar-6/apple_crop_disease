@@ -8,77 +8,71 @@ from keras.models import load_model
 from keras.preprocessing import image
 from dotenv import load_dotenv
 
-# ==========================================================
-# Load environment variables (for local and Render)
-# ==========================================================
+# ============================
+# Load Environment Variables
+# ============================
 load_dotenv()
 
-# ==========================================================
-# Flask app setup
-# ==========================================================
+# ============================
+# Flask App Setup
+# ============================
 app = Flask(__name__)
 
-# ==========================================================
+# ============================
 # Model Configuration
-# ==========================================================
+# ============================
 MODEL_PATH = "AlexNet_Optimized.h5"
 MODEL_URL = "https://huggingface.co/ajaykumar-6/apple_model/resolve/main/AlexNet_Optimized.h5"
 
-# ==========================================================
-# Function to download model from Hugging Face
-# ==========================================================
+# ============================
+# Download Model from Hugging Face (Safe + Resilient)
+# ============================
 def download_model():
-    """Download the model from Hugging Face Hub if not present or corrupted."""
-    hf_token = os.getenv("hf_token")  # Securely loaded token from environment
-    headers = {"Authorization": f"Bearer {hf_token}"} if hf_token else {}
+    """Download model file from Hugging Face (supports public/private models)."""
+    try:
+        hf_token = os.getenv("hf_token")  # Get token from environment if needed
+        headers = {"Authorization": f"Bearer {hf_token}"} if hf_token else {}
 
-    if not os.path.exists(MODEL_PATH) or os.path.getsize(MODEL_PATH) < 1_000_000:
-        print("📥 Downloading model from Hugging Face...")
-        response = requests.get(MODEL_URL, headers=headers, stream=True)
+        if not os.path.exists(MODEL_PATH) or os.path.getsize(MODEL_PATH) < 1_000_000:
+            print("📥 Downloading model from Hugging Face...")
+            response = requests.get(MODEL_URL, headers=headers, stream=True, timeout=60)
+            if response.status_code == 401:
+                print("⚠️ Warning: Unauthorized access — model might be private or gated.")
+                return
+            response.raise_for_status()
 
-        # Unauthorized (private repo + no token)
-        if response.status_code == 401:
-            raise PermissionError(
-                "❌ Unauthorized: Your Hugging Face model is private. "
-                "Please add your HF_TOKEN to Render environment variables."
-            )
+            # Check if it’s HTML (means invalid URL)
+            if b"<html" in response.content[:500]:
+                print("❌ Invalid response (HTML) — check your Hugging Face URL!")
+                return
 
-        # Not found (bad URL or filename)
-        if response.status_code == 404:
-            raise FileNotFoundError(
-                "❌ Model not found. Please verify your MODEL_URL and filename on Hugging Face."
-            )
+            # Save model file
+            with open(MODEL_PATH, "wb") as f:
+                for chunk in response.iter_content(8192):
+                    f.write(chunk)
+            print("✅ Model downloaded successfully!")
+        else:
+            print("✅ Model already exists locally.")
+    except Exception as e:
+        print(f"❌ Model load failed: {e}")
 
-        response.raise_for_status()
+# Download model before app loads
+download_model()
 
-        # Ensure it’s an actual binary file, not HTML
-        if b"<html" in response.content[:500]:
-            raise ValueError("❌ Invalid file download — got HTML instead of a model file!")
-
-        with open(MODEL_PATH, "wb") as f:
-            for chunk in response.iter_content(8192):
-                f.write(chunk)
-
-        print("✅ Model downloaded successfully!")
-    else:
-        print("✅ Model already exists locally. Skipping download.")
-
-
-# ==========================================================
-# Load Model Safely
-# ==========================================================
+# ============================
+# Load Keras Model
+# ============================
 try:
-    download_model()
-    print("🔍 Loading Model ...")
+    print("🔍 Loading model...")
     model = load_model(MODEL_PATH)
-    print("✅ Model Loaded Successfully!")
+    print("✅ Model loaded successfully!")
 except Exception as e:
-    print(f"❌ Model load failed: {e}")
     model = None
+    print(f"❌ Failed to load model: {e}")
 
-# ==========================================================
+# ============================
 # Class Labels
-# ==========================================================
+# ============================
 class_labels = [
     'Apple__black_rot',
     'Apple__healthy',
@@ -86,9 +80,9 @@ class_labels = [
     'Apple__scab'
 ]
 
-# ==========================================================
+# ============================
 # Disease Information
-# ==========================================================
+# ============================
 disease_info = {
     'Apple__black_rot': {
         'precautions': [
@@ -142,13 +136,12 @@ disease_info = {
     }
 }
 
-# ==========================================================
+# ============================
 # Prediction Function
-# ==========================================================
+# ============================
 def model_predict(img_path, model):
     if model is None:
-        return "Error: Model not loaded", "", "", 0, {}
-
+        return None, None, None, 0, {}
     img = image.load_img(img_path, target_size=(224, 224))
     x = image.img_to_array(img)
     x = np.expand_dims(x, axis=0)
@@ -169,18 +162,17 @@ def model_predict(img_path, model):
 
     return predicted_label, crop, disease, confidence, all_confidences
 
-# ==========================================================
+# ============================
 # Routes
-# ==========================================================
+# ============================
 @app.route('/')
 def index():
     return render_template('index.html')
 
-
 @app.route('/predict', methods=['POST'])
 def upload():
     if model is None:
-        return "<div class='alert alert-danger'>Model not loaded properly. Check server logs.</div>", 500
+        return "<div class='alert alert-danger'>Model failed to load. Please check the logs.</div>", 500
 
     if 'file' not in request.files:
         return "<div class='alert alert-danger'>No file uploaded!</div>", 400
@@ -230,11 +222,10 @@ def upload():
     """
     return result
 
-
-# ==========================================================
-# Run App
-# ==========================================================
+# ============================
+# Run App (Render-Compatible)
+# ============================
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 10000))  # Render provides PORT env var
-    app.run(host="0.0.0.0", port=port)
-
+    port = int(os.environ.get("PORT", 10001))
+    print(f"🚀 Starting server on port {port}")
+    app.run(host="0.0.0.0", port=port, debug=False)
