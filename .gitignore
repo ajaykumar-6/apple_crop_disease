@@ -1,0 +1,23 @@
+# --- Ignore Python virtual environments ---
+venv/
+
+.env
+# --- Ignore Python cache and temp files ---
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.log
+
+# --- Ignore system and editor files ---
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# --- Ignore uploads or local generated files ---
+uploads/
+
+*.h5
+*.pptx
+".env" 

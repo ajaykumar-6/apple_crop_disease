@@ -1,0 +1,7 @@
+services:
+  - type: web
+    name: crop-disease-detection
+    env: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    autoDeploy: true

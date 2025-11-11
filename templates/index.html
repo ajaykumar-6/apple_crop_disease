@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="text-center">
+    <h2 class="text-success fw-bold">🌱 Upload an Apple Leaf Image</h2>
+    <p class="text-muted">Get instant disease detection, precautions, and treatment tips.</p>
+
+<img src="{{ url_for('static', filename='apple_demo.jpeg') }}" class="example-img rounded shadow-sm mb-3" alt="Apple Leaf Example">
+
+
+    <form id="upload-file" method="post" enctype="multipart/form-data" class="p-3 border rounded bg-light shadow-sm">
+        <label for="imageUpload" class="upload-label btn btn-success btn-lg">Choose Image</label>
+        <input type="file" name="file" id="imageUpload" accept=".png, .jpg, .jpeg">
+    </form>
+
+    <div class="image-section" style="display:none;">
+        <div class="img-preview mx-auto mt-3" id="imagePreview"></div>
+        <button type="button" class="btn btn-primary mt-3" id="btn-predict">🔍 Predict Disease</button>
+    </div>
+
+    <div class="loader mt-3" style="display:none;"></div>
+    <div id="result" class="mt-4"></div>
+</div>
+{% endblock %}

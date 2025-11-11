@@ -1,0 +1,18 @@
+# --- Web Framework & Server ---
+Flask==3.0.3
+gunicorn==22.0.0
+gevent==23.9.1
+python-dotenv==1.0.1
+# --- Deep Learning Stack ---
+tensorflow-cpu==2.16.1      # CPU-only build (lighter & Render-friendly)
+keras==3.3.3
+numpy>=1.26.0
+h5py>=3.8.0
+
+# --- Utilities & Core Dependencies ---
+Jinja2==3.1.5
+Werkzeug==3.0.6
+itsdangerous>=2.1.2
+requests==2.31.0
+glob2==0.7
+future==0.18.3
