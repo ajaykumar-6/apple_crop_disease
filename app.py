@@ -9,7 +9,7 @@ from keras.preprocessing import image
 from dotenv import load_dotenv
 
 # ==========================================
-# Load environment variables from .env (for local use)
+# Load environment variables from .env (for local testing)
 # ==========================================
 load_dotenv()
 
@@ -23,17 +23,16 @@ app = Flask(__name__)
 # ==========================================
 MODEL_PATH = "AlexNet_Optimized.h5"
 MODEL_URL = "https://huggingface.co/ajaykumar-6/apple_model/resolve/main/AlexNet_Optimized.h5"
-model = None  # model will be loaded after the first request
+model = None  # model will be loaded after startup
 
 # ==========================================
 # Secure Model Download from Hugging Face
 # ==========================================
 def download_model():
     """Download model file from Hugging Face (with token if private)."""
-    hf_token = os.getenv("hf_token")  # must be named HF_TOKEN in Render settings
+    hf_token = os.getenv("hf_token")  # must match variable name in Render
     headers = {"Authorization": f"Bearer {hf_token}"} if hf_token else {}
 
-    # Only download if model doesn't exist or is incomplete
     if not os.path.exists(MODEL_PATH) or os.path.getsize(MODEL_PATH) < 1_000_000:
         print("📥 Downloading model from Hugging Face...")
         response = requests.get(MODEL_URL, headers=headers, stream=True)
@@ -41,14 +40,12 @@ def download_model():
         if response.status_code == 401:
             raise PermissionError(
                 "❌ Unauthorized access: Hugging Face model is private. "
-                "Add your HF_TOKEN to Render Environment Variables."
+                "Add your HF_TOKEN to Render environment variables."
             )
-
         response.raise_for_status()
 
-        # Ensure it's a binary .h5 file, not HTML
         if b"<html" in response.content[:500]:
-            raise ValueError("❌ Invalid download — received HTML instead of .h5 file.")
+            raise ValueError("❌ Invalid download — received HTML instead of model binary.")
 
         with open(MODEL_PATH, "wb") as f:
             for chunk in response.iter_content(8192):
@@ -56,14 +53,15 @@ def download_model():
                     f.write(chunk)
         print("✅ Model downloaded successfully!")
     else:
-        print("✅ Model already exists locally — skipping download.")
+        print("✅ Model already exists locally, skipping download.")
+
 
 # ==========================================
-# Load Model After Flask Starts
+# Load Model Before Serving Requests (Flask 3.x)
 # ==========================================
-@app.before_first_request
+@app.before_serving
 def load_model_after_start():
-    """Load the Keras model after Flask starts (non-blocking for Render)."""
+    """Runs before the app starts serving — loads the model asynchronously."""
     global model
     try:
         download_model()
@@ -72,6 +70,7 @@ def load_model_after_start():
         print("✅ Model Loaded Successfully!")
     except Exception as e:
         print(f"❌ Model loading failed: {e}")
+
 
 # ==========================================
 # Class Labels
@@ -134,7 +133,7 @@ disease_info = {
     },
     'Apple__healthy': {
         'precautions': ['Maintain regular pruning and tree hygiene.'],
-        'fertilizers': ['Apply balanced NPK as per soil test results.'],
+        'fertilizers': ['Apply NPK fertilizer as per soil test results.'],
         'pesticides': ['No pesticide required; continue preventive care.']
     }
 }
@@ -163,6 +162,7 @@ def model_predict(img_path, model):
 
     return predicted_label, crop, disease, confidence, all_confidences
 
+
 # ==========================================
 # Routes
 # ==========================================
@@ -174,7 +174,7 @@ def index():
 def upload():
     global model
     if model is None:
-        return "<h4>⏳ Model is still loading. Please wait a few seconds...</h4>", 503
+        return "<h4>⏳ Model is still loading. Please wait...</h4>", 503
 
     if 'file' not in request.files:
         return "<div class='alert alert-danger'>No file uploaded!</div>", 400
@@ -224,8 +224,9 @@ def upload():
     """
     return result
 
+
 # ==========================================
-# Run App (Render Compatible)
+# Run App (Render-Compatible)
 # ==========================================
 if __name__ == '__main__':
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)), debug=False)
