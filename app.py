@@ -1,5 +1,6 @@
 from __future__ import division, print_function
 import os
+import threading
 import requests
 import numpy as np
 from flask import Flask, request, render_template
@@ -9,12 +10,12 @@ from keras.preprocessing import image
 from dotenv import load_dotenv
 
 # ==========================================
-# Load environment variables from .env (for local testing)
+# Load .env for local development
 # ==========================================
 load_dotenv()
 
 # ==========================================
-# Flask App Setup
+# Flask app setup
 # ==========================================
 app = Flask(__name__)
 
@@ -23,27 +24,25 @@ app = Flask(__name__)
 # ==========================================
 MODEL_PATH = "AlexNet_Optimized.h5"
 MODEL_URL = "https://huggingface.co/ajaykumar-6/apple_model/resolve/main/AlexNet_Optimized.h5"
-model = None  # model will be loaded after startup
+model = None  # model will be loaded in background
 
 # ==========================================
-# Secure Model Download from Hugging Face
+# Secure Model Download
 # ==========================================
 def download_model():
-    """Download model file from Hugging Face (with token if private)."""
-    hf_token = os.getenv("hf_token")  # must match variable name in Render
+    """Download model file from Hugging Face (with optional token)."""
+    hf_token = os.getenv("HF_TOKEN")
     headers = {"Authorization": f"Bearer {hf_token}"} if hf_token else {}
 
     if not os.path.exists(MODEL_PATH) or os.path.getsize(MODEL_PATH) < 1_000_000:
         print("📥 Downloading model from Hugging Face...")
         response = requests.get(MODEL_URL, headers=headers, stream=True)
-
         if response.status_code == 401:
             raise PermissionError(
                 "❌ Unauthorized access: Hugging Face model is private. "
                 "Add your HF_TOKEN to Render environment variables."
             )
         response.raise_for_status()
-
         if b"<html" in response.content[:500]:
             raise ValueError("❌ Invalid download — received HTML instead of model binary.")
 
@@ -56,21 +55,22 @@ def download_model():
         print("✅ Model already exists locally, skipping download.")
 
 
-# ==========================================
-# Load Model Before Serving Requests (Flask 3.x)
-# ==========================================
-@app.before_serving
-def load_model_after_start():
-    """Runs before the app starts serving — loads the model asynchronously."""
+def load_model_background():
+    """Loads the model in a separate background thread."""
     global model
     try:
         download_model()
-        print("🔍 Loading Model...")
+        print("🔍 Loading model...")
         model = load_model(MODEL_PATH)
-        print("✅ Model Loaded Successfully!")
+        print("✅ Model loaded successfully!")
     except Exception as e:
         print(f"❌ Model loading failed: {e}")
 
+
+# ==========================================
+# Start background model loading at app startup
+# ==========================================
+threading.Thread(target=load_model_background, daemon=True).start()
 
 # ==========================================
 # Class Labels
@@ -169,6 +169,7 @@ def model_predict(img_path, model):
 @app.route('/')
 def index():
     return render_template('index.html')
+
 
 @app.route('/predict', methods=['POST'])
 def upload():
