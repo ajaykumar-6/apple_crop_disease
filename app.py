@@ -22,7 +22,7 @@ app = Flask(__name__)
 # Model Configuration
 # ==========================================================
 MODEL_PATH = "AlexNet_Optimized.h5"
-MODEL_URL = "https://huggingface.co/ajaykumar-6/apple_model/blob/main/AlexNet_Optimized.h5"
+MODEL_URL = "https://huggingface.co/ajaykumar-6/apple_model/resolve/main/AlexNet_Optimized.h5"
 
 # ==========================================================
 # Function to download model from Hugging Face
